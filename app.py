@@ -191,7 +191,7 @@ with col2:
             st.markdown(
                 """
                 <div style="text-align:center; font-size:21px; color:#555; margin-top:10px;">
-                    Welcome to <b>Foodie Finder!</b> 🐼<br>
+                    Welcome  <b>Foodie Finder!</b> 🐼<br>
                     Enter your location & budget for meals.
                 </div>
                 """,
