@@ -6,6 +6,52 @@ import pandas as pd
 st.set_page_config(page_title="Meal Recommender", page_icon="🍽", layout="wide")
 st.title("📍MapMyMeal🍲")
 
+# ---------- Theme-aware cards (no feature changes) ----------
+st.markdown("""
+<style>
+:root, [data-theme="light"]{
+  --mm-card-bg: var(--secondary-background-color);
+  --mm-card-text: var(--text-color);
+  --mm-card-border: var(--background-color);
+  --mm-muted: var(--secondary-text-color);
+}
+[data-theme="dark"]{
+  /* Use the same Streamlit vars so it auto-adapts in dark mode */
+  --mm-card-bg: var(--secondary-background-color);
+  --mm-card-text: var(--text-color);
+  --mm-card-border: var(--background-color);
+  --mm-muted: var(--secondary-text-color);
+}
+
+/* Generic card */
+.mm-card{
+  padding:12px;
+  margin-bottom:12px;
+  border:1px solid var(--mm-card-border);
+  border-radius:12px;
+  background:var(--mm-card-bg);
+  color:var(--mm-card-text);
+}
+
+/* Smaller card variant for restaurant list */
+.mm-restaurant{
+  padding:8px;
+  margin-bottom:8px;
+  border:1px solid var(--mm-card-border);
+  border-radius:8px;
+  background:var(--mm-card-bg);
+  color:var(--mm-card-text);
+}
+
+.restaurant-name{ font-weight:700; color:var(--mm-card-text) !important; }
+.small-muted{ font-size:12px; color:var(--mm-muted) !important; }
+.mm-note{ font-size:14px; color:var(--mm-muted) !important; }
+
+/* Keep headings readable in both themes */
+h1, h2, h3, h4, h5, h6 { color: var(--text-color) !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ————————————————————
 # Initialize session state
 # ————————————————————
@@ -211,7 +257,8 @@ with col2:
             st.session_state["coords"] = coords
         lat, lon = st.session_state["coords"]
 
-        st.markdown(f"📌 Coordinates found:** {lat:.4f}, {lon:.4f}")
+        # (Fix formatting: make the numbers bold properly)
+        st.markdown(f"📌 Coordinates found: **{lat:.4f}, {lon:.4f}**")
 
         # Fetch restaurants using lat/lon
         if not st.session_state["restaurants"]:
@@ -252,39 +299,29 @@ with col2:
             with st.spinner("🍴 Cooking up your personalized meal plan..."):
                 st.session_state["suggestion"] = generate_suggestion()
 
-        # Display suggestion
+        # Display suggestion (keep cards, no blank ones) — now theme-aware
         for line in st.session_state["suggestion"].split("\n"):
-            st.markdown(
-                f"""
-                <div style="padding:12px; margin-bottom:12px; border:1px solid #ddd; 
-                            border-radius:12px; background-color:#f9f9f9;">
-                    {line}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            if line.strip():  # skip blank lines
+                st.markdown(
+                    f"<div class='mm-card'>{line.strip()}</div>",
+                    unsafe_allow_html=True,
+                )
 
-                    # Note about prices/availability
+        # Note about prices/availability — theme-aware card
         st.markdown(
-            """
-            <div style="margin-top: 5px; padding:10px; font-size:14px; color:gray;">
-                💡 Note: Prices and availability may vary depending on restaurant and time.
-            </div>
-            """,
+            "<div class='mm-card mm-note'>💡 Note: Prices and availability may vary depending on restaurant and time.</div>",
             unsafe_allow_html=True,
         )
 
-
-        # Nearby restaurants
-        st.markdown("### 📍 Nearby Restaurants")  
+        # Nearby restaurants (expander kept; items now use theme-aware card)
+        st.markdown("### 📍 Nearby Restaurants")
         with st.expander("📍 See nearby restaurants"):
             for r in restaurants[:8]:
                 st.markdown(
                     f"""
-                    <div style="padding:8px; margin-bottom:8px; border:1px solid #eee; 
-                                border-radius:8px; background-color:#fafafa;">
-                        <b>{r.get('title','Unknown')}</b> — ⭐ {r.get('rating','N/A')} — {r.get('price','N/A')}
-                        <br><small>{r.get("address","")}</small>
+                    <div class="mm-restaurant">
+                        <b class="restaurant-name">{r.get('title','Unknown')}</b> — ⭐ {r.get('rating','N/A')} — {r.get('price','N/A')}
+                        <br><span class="small-muted">{r.get("address","")}</span>
                     </div>
                     """,
                     unsafe_allow_html=True,
