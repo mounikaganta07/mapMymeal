@@ -336,3 +336,4 @@ if st.session_state["submit_clicked"] and st.session_state["coords"]:
                              "lon": float(st.session_state["coords"][1]),
                              "size": 20 }])
     st.map(df_map, zoom=12, use_container_width=True)
+
