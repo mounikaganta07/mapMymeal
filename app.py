@@ -16,14 +16,12 @@ st.markdown("""
   --mm-muted: var(--secondary-text-color);
 }
 [data-theme="dark"]{
-  /* Use the same Streamlit vars so it auto-adapts in dark mode */
   --mm-card-bg: var(--secondary-background-color);
   --mm-card-text: var(--text-color);
   --mm-card-border: var(--background-color);
   --mm-muted: var(--secondary-text-color);
 }
 
-/* Generic card */
 .mm-card{
   padding:12px;
   margin-bottom:12px;
@@ -33,7 +31,6 @@ st.markdown("""
   color:var(--mm-card-text);
 }
 
-/* Smaller card variant for restaurant list */
 .mm-restaurant{
   padding:8px;
   margin-bottom:8px;
@@ -47,14 +44,13 @@ st.markdown("""
 .small-muted{ font-size:12px; color:var(--mm-muted) !important; }
 .mm-note{ font-size:14px; color:var(--mm-muted) !important; }
 
-/* Keep headings readable in both themes */
 h1, h2, h3, h4, h5, h6 { color: var(--text-color) !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ————————————————————
+# —————————————————
 # Initialize session state
-# ————————————————————
+# —————————————————
 if "submit_clicked" not in st.session_state:
     st.session_state["submit_clicked"] = False
 if "suggestion" not in st.session_state:
@@ -66,9 +62,10 @@ if "restaurants" not in st.session_state:
 if "restaurant_menus" not in st.session_state:
     st.session_state["restaurant_menus"] = {}
 
-# ————————————————————
+# —————————————————
 # Load API keys from Streamlit secrets
-# ————————————————————
+# —————————————————
+
 def get_secret(name: str) -> str:
     try:
         return st.secrets[name]
@@ -76,19 +73,13 @@ def get_secret(name: str) -> str:
         st.error(f"Missing secret: {name}. Add it in .streamlit/secrets.toml.")
         st.stop()
 
-# Load keys
 SERPAPI_KEY = get_secret("SERPAPI_KEY")
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 
-# Optional debug checkbox
-show_debug = st.checkbox("Show debug details")
-if show_debug:
-    st.write("✅ SERPAPI_KEY loaded:", bool(SERPAPI_KEY))
-    st.write("✅ OPENROUTER_API_KEY loaded:", bool(OPENROUTER_API_KEY))
-
-# ————————————————————
+# —————————————————
 # Helpers
-# ————————————————————
+# —————————————————
+
 def geocode_location(query: str):
     url = "https://nominatim.openstreetmap.org/search"
     headers = {"User-Agent": "meal-recommendation-app (educational use)"}
@@ -103,6 +94,8 @@ def geocode_location(query: str):
     except requests.RequestException as e:
         st.error(f"Error fetching coordinates: {e}")
         return None
+
+
 
 def fetch_restaurants(lat: float, lon: float, diet: str = "Any", limit: int = 50):
     if diet == "Vegetarian":
@@ -222,12 +215,21 @@ col1, col2 = st.columns([1, 1.2], gap="large")
 
 with col1:
     location = st.text_input("📍 Enter your location (e.g., Chennai, Bengaluru, Delhi)")
-    budget = st.number_input("💰 Enter your per-meal budget (₹)", min_value=50, max_value=2000, step=50, value=200)
+    budget_input = st.text_input("💰 Enter your per-meal budget greater than ₹50", placeholder="Enter amount")
     diet = st.selectbox("🥗 Choose your diet", ["Any", "Vegetarian", "Vegan", "Non-Vegetarian"])
-    
+
     if st.button("Generate Meal Plan"):
-        st.session_state["submit_clicked"] = True
-        st.session_state["suggestion"] = ""  # reset previous suggestions
+        if not location:
+            st.warning("⚠️ Please enter a valid location.")
+        elif not budget_input:
+            st.warning("⚠️ Please enter your budget.")
+        elif not budget_input.isdigit() or int(budget_input) <= 50:
+            st.warning("⚠️ Budget must be a number greater than ₹50.")
+        else:
+            budget = int(budget_input)
+            st.session_state["submit_clicked"] = True
+            st.session_state["suggestion"] = ""  # reset previous suggestions
+
 
 with col2:
     if not st.session_state["submit_clicked"]:
