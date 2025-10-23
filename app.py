@@ -3,6 +3,11 @@ import requests
 from textwrap import dedent
 import pandas as pd
 
+# ------------------------
+# Debug flag
+# ------------------------
+show_debug = False
+
 st.set_page_config(page_title="Meal Recommender", page_icon="🍽", layout="wide")
 st.title("📍MapMyMeal🍲")
 
@@ -61,11 +66,12 @@ if "restaurants" not in st.session_state:
     st.session_state["restaurants"] = []
 if "restaurant_menus" not in st.session_state:
     st.session_state["restaurant_menus"] = {}
+if "budget" not in st.session_state:
+    st.session_state["budget"] = 500  # default value
 
 # —————————————————
 # Load API keys from Streamlit secrets
 # —————————————————
-
 def get_secret(name: str) -> str:
     try:
         return st.secrets[name]
@@ -79,7 +85,6 @@ OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 # —————————————————
 # Helpers
 # —————————————————
-
 def geocode_location(query: str):
     url = "https://nominatim.openstreetmap.org/search"
     headers = {"User-Agent": "meal-recommendation-app (educational use)"}
@@ -94,8 +99,6 @@ def geocode_location(query: str):
     except requests.RequestException as e:
         st.error(f"Error fetching coordinates: {e}")
         return None
-
-
 
 def fetch_restaurants(lat: float, lon: float, diet: str = "Any", limit: int = 50):
     if diet == "Vegetarian":
@@ -114,7 +117,7 @@ def fetch_restaurants(lat: float, lon: float, diet: str = "Any", limit: int = 50
         "google_domain": "google.com",
         "hl": "en",
         "api_key": SERPAPI_KEY,
-        "ll": f"@{lat},{lon},14z",   # ✅ use lat/lon for real nearby results
+        "ll": f"@{lat},{lon},14z",
     }
 
     try:
@@ -227,9 +230,9 @@ with col1:
             st.warning("⚠️ Budget must be a number greater than ₹50.")
         else:
             budget = int(budget_input)
+            st.session_state["budget"] = budget
             st.session_state["submit_clicked"] = True
             st.session_state["suggestion"] = ""  # reset previous suggestions
-
 
 with col2:
     if not st.session_state["submit_clicked"]:
@@ -259,10 +262,9 @@ with col2:
             st.session_state["coords"] = coords
         lat, lon = st.session_state["coords"]
 
-        # (Fix formatting: make the numbers bold properly)
         st.markdown(f"📌 Coordinates found: **{lat:.4f}, {lon:.4f}**")
 
-        # Fetch restaurants using lat/lon
+        # Fetch restaurants
         if not st.session_state["restaurants"]:
             restaurants = fetch_restaurants(lat, lon, diet=diet)
             if not restaurants:
@@ -283,7 +285,7 @@ with col2:
         def generate_suggestion():
             return ai_meal_plan(
                 location,
-                int(budget),
+                st.session_state.get("budget", 500),
                 diet,
                 restaurants,
                 menus=restaurant_menus
@@ -296,26 +298,26 @@ with col2:
         with col_b:
             shuffle_clicked = st.button("🔄")
 
-        # Generate new suggestion if first time or shuffle clicked
+        # Generate new suggestion
         if st.session_state["suggestion"] == "" or shuffle_clicked:
             with st.spinner("🍴 Cooking up your personalized meal plan..."):
                 st.session_state["suggestion"] = generate_suggestion()
 
-        # Display suggestion (keep cards, no blank ones) — now theme-aware
+        # Display suggestion
         for line in st.session_state["suggestion"].split("\n"):
-            if line.strip():  # skip blank lines
+            if line.strip():
                 st.markdown(
                     f"<div class='mm-card'>{line.strip()}</div>",
                     unsafe_allow_html=True,
                 )
 
-        # Note about prices/availability — theme-aware card
+        # Note
         st.markdown(
             "<div class='mm-card mm-note'>💡 Note: Prices and availability may vary depending on restaurant and time.</div>",
             unsafe_allow_html=True,
         )
 
-        # Nearby restaurants (expander kept; items now use theme-aware card)
+        # Nearby restaurants
         st.markdown("### 📍 Nearby Restaurants")
         with st.expander("📍 See nearby restaurants"):
             for r in restaurants[:8]:
@@ -334,8 +336,9 @@ with col2:
 # ————————————————————
 if st.session_state["submit_clicked"] and st.session_state["coords"]:
     st.markdown("## 🌍 Explore the Area")
-    df_map = pd.DataFrame([{ "lat": float(st.session_state["coords"][0]),
-                             "lon": float(st.session_state["coords"][1]),
-                             "size": 20 }])
+    df_map = pd.DataFrame([{
+        "lat": float(st.session_state["coords"][0]),
+        "lon": float(st.session_state["coords"][1]),
+        "size": 20
+    }])
     st.map(df_map, zoom=12, use_container_width=True)
-
