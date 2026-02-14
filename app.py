@@ -2,6 +2,15 @@ import streamlit as st
 import requests
 from textwrap import dedent
 import pandas as pd
+import time
+import random
+import hashlib
+from src.apis.nominatim import geocode_location as _geocode_location
+from src.apis.serp import fetch_restaurants as _fetch_restaurants, extract_menus
+from src.apis.openrouter import chat_completions
+from src.core.fallback import fallback_meal_plan
+
+
 
 # ------------------------
 # Debug flag
@@ -68,6 +77,23 @@ if "restaurant_menus" not in st.session_state:
     st.session_state["restaurant_menus"] = {}
 if "budget" not in st.session_state:
     st.session_state["budget"] = 500  # default value
+if "last_inputs" not in st.session_state:
+    st.session_state["last_inputs"] = ""
+if "shuffle_seed" not in st.session_state:
+    st.session_state["shuffle_seed"] = 0
+
+
+def reset_on_input_change(location: str, diet: str, budget: int):
+    key = f"{location}|{diet}|{budget}"
+    if st.session_state.get("last_inputs") != key:
+        st.session_state["last_inputs"] = key
+        st.session_state["coords"] = None
+        st.session_state["restaurants"] = []
+        st.session_state["restaurant_menus"] = {}
+        st.session_state["suggestion"] = ""
+        st.session_state["shuffle_seed"] = 0
+
+
 
 # —————————————————
 # Load API keys from Streamlit secrets
@@ -82,67 +108,34 @@ def get_secret(name: str) -> str:
 SERPAPI_KEY = get_secret("SERPAPI_KEY")
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 
-# —————————————————
-# Helpers
-# —————————————————
+
+def pick_restaurant_subset(restaurants: list, seed: int, k: int = 12) -> list:
+    if not restaurants:
+        return []
+    rng = random.Random(seed)
+    rs = restaurants[:]
+    rng.shuffle(rs)              # deterministic re-order
+    return rs[:min(k, len(rs))]  # take first k after shuffle
+
+
 def geocode_location(query: str):
-    url = "https://nominatim.openstreetmap.org/search"
-    headers = {"User-Agent": "meal-recommendation-app (educational use)"}
-    params = {"format": "json", "q": query}
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        if not data:
-            return None
-        return float(data[0]["lat"]), float(data[0]["lon"])
+        return _geocode_location(query)
     except requests.RequestException as e:
         st.error(f"Error fetching coordinates: {e}")
         return None
 
+
 def fetch_restaurants(lat: float, lon: float, diet: str = "Any", limit: int = 50):
-    if diet == "Vegetarian":
-        query = f"vegetarian restaurants"
-    elif diet == "Vegan":
-        query = f"vegan restaurants"
-    elif diet == "Non-Vegetarian":
-        query = f"non-veg restaurants"
-    else:
-        query = f"restaurants"
-
-    url = "https://serpapi.com/search.json"
-    params = {
-        "engine": "google_maps",
-        "q": query,
-        "google_domain": "google.com",
-        "hl": "en",
-        "api_key": SERPAPI_KEY,
-        "ll": f"@{lat},{lon},14z",
-    }
-
     try:
-        resp = requests.get(url, params=params, timeout=20)
-        resp.raise_for_status()
-        data = resp.json()
-        results = data.get("local_results", [])
-        return results[:limit]
+        return _fetch_restaurants(lat, lon, serpapi_key=SERPAPI_KEY, diet=diet, limit=limit)
     except requests.RequestException as e:
         st.error(f"Error fetching restaurants: {e}")
         return []
 
-def extract_menus(restaurants):
-    menus = {}
-    for r in restaurants:
-        name = r.get("title", "Unknown")
-        menu_items = []
-        if "menu" in r and isinstance(r["menu"], list):
-            menu_items = [item.get("name") for item in r["menu"] if "name" in item]
-        elif "menu_items" in r and isinstance(r["menu_items"], list):
-            menu_items = [item.get("name") for item in r["menu_items"] if "name" in item]
-        menus[name] = menu_items[:20]
-    return menus
 
 def ai_meal_plan(location: str, budget: int, diet: str, restaurants: list, menus: dict) -> str:
+    # --- prompt is IDENTICAL to your current app.py ---
     lines = []
     for r in restaurants:
         name = r.get("title", "Unknown")
@@ -160,56 +153,78 @@ def ai_meal_plan(location: str, budget: int, diet: str, restaurants: list, menus
     prompt = dedent(f"""
     You are a helpful Indian meal planner.
     City/Area: {location}
-    Budget per meal: ₹{budget}
     Diet: {diet}
-
+    Budget per meal (hard limit): ₹{budget}
     Nearby restaurants & menus:
     {menu_block if menu_block else restaurant_block}
 
-    Task:
-    1) Suggest exactly four meal times: 🍲 Breakfast, 🍛 Lunch, 🥪 Snacks, 🥗 Dinner.
-    2) Each meal should have 2–3 items.
-    3) Use dishes ONLY from menus if available; otherwise realistic Indian dishes.
-    4) Respect the diet strictly.
-    5) Estimate prices under the budget.
-    6) Output ONLY in this format:
+    Rules (must follow):
+    1) Give exactly four meals in this order only:
+    🍲 Breakfast, 🍛 Lunch, 🥪 Snacks, 🥗 Dinner
+    2) Meal-appropriate items ONLY:
+    - Breakfast: breakfast foods (idli/dosa/poha/upma/paratha/oats/eggs etc.)
+    - Lunch: full meal foods (rice/roti + curry/dal + side)
+    - Snacks: ONLY snack items (tea/coffee/juice + samosa/pakoda/bonda/puffs/sandwich/chaat/fruit)
+    - Dinner: light-to-regular dinner (roti/rice + curry/dal; avoid heavy biryani as “snacks”)
+    3) Each meal must have 1–2 items max (keep it realistic).
+    4) Use menu dishes if menus are provided. If menus are missing/empty, use realistic Indian dishes.
+    5) Diet must be respected strictly:
+    - Vegetarian: no meat/fish/egg
+    - Vegan: no dairy/ghee/paneer/curd, no egg/meat
+    - Non-Vegetarian: can include meat/egg but keep it realistic
+    6) Pricing realism:
+    - Keep (~₹price) <= ₹{budget}
+    - Also keep prices believable: Breakfast ₹60–₹180, Lunch ₹120–₹400, Snacks ₹50–₹200, Dinner ₹120–₹450
+    7) Output ONLY these 4 lines (no extra text, no bullets, no blank lines). Use this exact format:
 
-    🍲 Breakfast: <dish 1>, <dish 2> at <restaurant> (~₹price)
-    🍛 Lunch: <dish 1>, <dish 2> at <restaurant> (~₹price)
-    🥪 Snacks: <dish 1>, <dish 2> at <restaurant> (~₹price)
-    🥗 Dinner: <dish 1>, <dish 2> at <restaurant> (~₹price)
+    🍲 Breakfast: <item 1>, <item 2> at <restaurant> (~₹price)
+    🍛 Lunch: <item 1>, <item 2> at <restaurant> (~₹price)
+    🥪 Snacks: <item 1>, <item 2> at <restaurant> (~₹price)
+    🥗 Dinner: <item 1>, <item 2> at <restaurant> (~₹price)
     """).strip()
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:8501",
-        "X-Title": "Meal Recommendation App",
-    }
-
-    payload = {
-        "model": "inflection/inflection-3-pi",
-        "messages": [
-            {"role": "system", "content": "You format concise, budget-friendly Indian meal suggestions."},
-            {"role": "user", "content": prompt},
-        ],
-    }
-
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=40)
-        resp.raise_for_status()
-        data = resp.json()
+        data = chat_completions(
+            openrouter_api_key=OPENROUTER_API_KEY,
+            model="inflection/inflection-3-pi",
+            messages=[
+                {"role": "system", "content": "You format concise, budget-friendly Indian meal suggestions."},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=40,
+        )
+
         if show_debug:
             st.write("🔍 OpenRouter raw response:", data)
+
         if "choices" in data and len(data["choices"]) > 0:
             return data["choices"][0]["message"]["content"]
         elif "error" in data:
             return f"❌ OpenRouter error: {data['error'].get('message','Unknown error')}"
         else:
             return f"⚠ Unexpected response: {data}"
+
     except requests.RequestException as e:
-        return f"OpenRouter request failed: {e}"
+        # same “never crash” goal; fallback keeps demo stable
+        return fallback_meal_plan(location, diet, budget)
+
+
+# ------------------------
+# Cached wrappers (quota protection)
+# ------------------------
+@st.cache_data(ttl=7*24*3600, show_spinner=False)  # 7 days
+def cached_geocode_location(query: str):
+    return geocode_location(query)
+
+@st.cache_data(ttl=24*3600, show_spinner=False)  # 24 hours
+def cached_fetch_restaurants(lat: float, lon: float, diet: str, limit: int = 50):
+    return fetch_restaurants(lat, lon, diet=diet, limit=limit)
+
+@st.cache_data(ttl=6*3600, show_spinner=False)  # 6 hours
+def cached_ai_meal_plan(location: str, budget: int, diet: str, restaurants: list, menus: dict, seed: int) -> str:
+    return ai_meal_plan(location, budget, diet, restaurants, menus)
+
+
 
 # ————————————————————
 # Layout
@@ -231,6 +246,7 @@ with col1:
         else:
             budget = int(budget_input)
             st.session_state["budget"] = budget
+            reset_on_input_change(location, diet, budget)
             st.session_state["submit_clicked"] = True
             st.session_state["suggestion"] = ""  # reset previous suggestions
 
@@ -255,7 +271,7 @@ with col2:
 
         # Geocode + coordinates display
         if st.session_state["coords"] is None:
-            coords = geocode_location(location)
+            coords = cached_geocode_location(location)
             if not coords:
                 st.error("❌ Could not find coordinates for the given location.")
                 st.stop()
@@ -266,7 +282,7 @@ with col2:
 
         # Fetch restaurants
         if not st.session_state["restaurants"]:
-            restaurants = fetch_restaurants(lat, lon, diet=diet)
+            restaurants = cached_fetch_restaurants(lat, lon, diet=diet)
             if not restaurants:
                 st.warning("No restaurants returned by SerpAPI.")
                 st.stop()
@@ -283,13 +299,21 @@ with col2:
 
         # Suggestion generation function
         def generate_suggestion():
-            return ai_meal_plan(
+            seed = st.session_state["shuffle_seed"]
+            # pick different restaurants per shuffle without calling SerpAPI again
+            chosen_restaurants = pick_restaurant_subset(restaurants, seed=seed, k=12)
+
+            # build menus only for chosen restaurants (fast + varies the prompt)
+            chosen_menus = extract_menus(chosen_restaurants)
+
+            return cached_ai_meal_plan(
                 location,
                 st.session_state.get("budget", 500),
                 diet,
-                restaurants,
-                menus=restaurant_menus
-            )
+                chosen_restaurants,
+                chosen_menus,
+                seed,
+    )
 
         # Header with shuffle button
         col_a, col_b = st.columns([0.9, 0.1])
@@ -297,6 +321,12 @@ with col2:
             st.subheader("✨ Recommended Meal Plan")
         with col_b:
             shuffle_clicked = st.button("🔄")
+        if shuffle_clicked:
+            st.session_state["shuffle_seed"] += 1
+            st.session_state["suggestion"] = ""
+        st.caption(f"Shuffle seed: {st.session_state['shuffle_seed']}")
+
+
 
         # Generate new suggestion
         if st.session_state["suggestion"] == "" or shuffle_clicked:

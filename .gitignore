@@ -1,17 +1,46 @@
-# Ignore Python cache
+# =========================
+# Python
+# =========================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
 
-# Ignore virtual environments
+# =========================
+# Virtual Environments
+# =========================
 .venv/
 venv/
+env/
 
-# Ignore environment files
+# =========================
+# Environment / Secrets
+# =========================
 .env
-
-# Ignore Streamlit secrets
 .streamlit/secrets.toml
 
-# Ignore OS/editor junk
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS Junk
+# =========================
 .DS_Store
 Thumbs.db
+*.lnk
+
+# =========================
+# Coverage
+# =========================
+.coverage
+htmlcov/
