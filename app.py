@@ -18,7 +18,26 @@ from src.core.fallback import fallback_meal_plan
 show_debug = False
 
 st.set_page_config(page_title="Meal Recommender", page_icon="🍽", layout="wide")
-st.title("📍MapMyMeal🍲")
+
+# ---------- Custom header (replaces st.title for cleaner spacing) ----------
+st.markdown("""
+<div class="mm-header">
+  <div class="mm-header-left">
+    <div class="mm-logo">📍</div>
+    <div>
+      <div class="mm-brand">MapMyMeal <span class="mm-brand-emoji">🍜</span></div>
+      <div class="mm-tagline">Location-based AI meal planner • budget-friendly • reliable</div>
+    </div>
+  </div>
+  <div class="mm-header-right">
+    <span class="mm-badge">⚡ Cached</span>
+    <span class="mm-badge">🧪 Tested</span>
+    <span class="mm-badge">✅ CI</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+
 
 # ---------- Theme-aware cards (no feature changes) ----------
 st.markdown("""
@@ -30,6 +49,73 @@ st.markdown("""
   --mm-muted: var(--secondary-text-color);
   --mm-accent: rgba(255, 165, 0, 0.20);
 }
+
+/* ============================= */
+/* Page spacing + header */
+/* ============================= */
+
+/* Reduce top padding so UI doesn't feel "floating" */
+.block-container{
+  padding-top: 5rem !important;
+}
+
+
+/* Header */
+.mm-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:16px;
+  margin: 6px 0 18px 0;
+}
+
+.mm-header-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.mm-logo{
+  font-size:40px;
+  line-height:1;
+}
+
+.mm-brand{
+  font-size:44px;
+  font-weight:900;
+  line-height:1.05;
+  color: var(--mm-card-text);
+}
+
+.mm-brand-emoji{
+  font-size:28px;
+}
+
+.mm-tagline{
+  margin-top:4px;
+  font-size:14px;
+  color: var(--mm-muted);
+}
+
+.mm-header-right{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.mm-badge{
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--mm-card-border);
+  background: var(--mm-card-bg);
+  color: var(--mm-card-text);
+}
+
+/* ============================= */
+/* Generic Cards */
+/* ============================= */
 
 .mm-card{
   padding:16px;
@@ -49,40 +135,149 @@ st.markdown("""
   color:var(--mm-card-text);
 }
 
-.restaurant-name{ font-weight:700; color:var(--mm-card-text) !important; }
-.small-muted{ font-size:12px; color:var(--mm-muted) !important; }
-.mm-note{ font-size:14px; color:var(--mm-muted) !important; }
+.restaurant-name{
+  font-weight:700;
+  color:var(--mm-card-text) !important;
+}
 
-h1, h2, h3, h4, h5, h6 { color: var(--text-color) !important; }
+.small-muted{
+  font-size:12px;
+  color:var(--mm-muted) !important;
+}
 
-/* Welcome hero (no image) */
-.mm-hero{
+.mm-note{
+  font-size:14px;
+  color:var(--mm-muted) !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-color) !important;
+}
+
+/* ============================= */
+/* Form Card Styling */
+/* ============================= */
+
+.mm-form-card{
+  padding:18px;
   border:1px solid var(--mm-card-border);
   border-radius:18px;
-  padding:18px;
-  background: linear-gradient(135deg, var(--mm-card-bg), var(--mm-accent));
+  background: var(--mm-card-bg);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  margin-bottom: 15px;
+}
+
+/* Premium button */
+.mm-form-card div.stButton > button{
+  border-radius: 12px;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+
+/* Rounded inputs (ONLY inside our form card) */
+.mm-form-card div[data-baseweb="input"] > div,
+.mm-form-card div[data-baseweb="select"] > div{
+  border-radius: 12px !important;
+}
+
+
+/* ============================= */
+/* Cute Animated Hero */
+/* ============================= */
+
+.mm-hero{
+  border:1px solid var(--mm-card-border);
+  border-radius:22px;
+  padding:22px;
+  background: linear-gradient(135deg, rgba(255,165,0,0.10), var(--mm-card-bg));
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  text-align:center;
+}
+
+/* Bowl container */
+.mm-bowl{
+  position:relative;
+  width:90px;
+  height:70px;
+  margin: 0 auto 12px auto;
+}
+
+/* Bowl emoji */
+.mm-bowl-emoji{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  transform: translateX(-50%);
+  font-size:52px;
+  line-height:1;
+}
+
+/* Steam animation */
+.mm-steam{
+  position:absolute;
+  top:0;
+  left:50%;
+  width:6px;
+  height:18px;
+  background: currentColor;
+  border-radius:50px;
+  opacity:0.55;
+  transform: translate(var(--x, 0px), 0px) scaleY(1);
+  animation: steamUp 2.5s infinite ease-in-out;
+}
+
+.mm-steam:nth-child(1){ --x: -18px; animation-delay:0s; }
+.mm-steam:nth-child(2){ --x: -3px;  animation-delay:0.4s; }
+.mm-steam:nth-child(3){ --x: 12px;  animation-delay:0.8s; }
+
+@keyframes steamUp{
+  0%   { transform: translate(var(--x, 0px), 0px) scaleY(1); opacity:0.55; }
+  50%  { transform: translate(var(--x, 0px), -10px) scaleY(1.35); opacity:0.35; }
+  100% { transform: translate(var(--x, 0px), 0px) scaleY(1); opacity:0.55; }
 }
 
 .mm-hero-title{
-  font-size:22px;
-  font-weight:800;
-  margin:0;
+  font-size:24px;
+  font-weight:900;
+  margin:6px 0;
 }
 
 .mm-hero-sub{
-  margin-top:6px;
   font-size:14px;
   color: var(--mm-muted);
-  line-height:1.4;
+  margin-bottom:10px;
 }
 
-.mm-hero-icons{
-  font-size:28px;
-  letter-spacing:3px;
-  margin-top:10px;
+.mm-chip-row{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:8px;
 }
+
+/* cleaner chips */
+.mm-chip{
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--mm-card-border);
+  background: transparent;
+  color: var(--mm-card-text);
+}
+
+.mm-tip{
+  margin-top:10px;
+  font-size:12px;
+  color: var(--mm-muted);
+}
+
+
 </style>
 """, unsafe_allow_html=True)
+
+
 
 
 # —————————————————
@@ -252,45 +447,101 @@ def cached_ai_meal_plan(location: str, budget: int, diet: str, restaurants: list
 # ————————————————————
 # Layout
 # ————————————————————
-col1, col2 = st.columns([1, 1.2], gap="large")
+col1, col2 = st.columns([1, 1.1])
 
+# ==========================
+# LEFT COLUMN — FORM
+# ==========================
 with col1:
-    location = st.text_input("📍 Enter your location (e.g., Chennai, Bengaluru, Delhi)")
-    budget_input = st.text_input("💰 Enter your per-meal budget greater than ₹50", placeholder="Enter amount")
-    diet = st.selectbox("🥗 Choose your diet", ["Any", "Vegetarian", "Vegan", "Non-Vegetarian"])
+    with st.container(border=True):
+        location = st.text_input(
+            "📍 Enter your location (e.g., Chennai, Bengaluru, Delhi)",
+            autocomplete="off"
+        )
 
-    if st.button("Generate Meal Plan"):
-        if not location:
-            st.warning("⚠️ Please enter a valid location.")
-        elif not budget_input:
-            st.warning("⚠️ Please enter your budget.")
-        elif not budget_input.isdigit() or int(budget_input) <= 50:
-            st.warning("⚠️ Budget must be a number greater than ₹50.")
-        else:
-            budget = int(budget_input)
-            st.session_state["budget"] = budget
-            reset_on_input_change(location, diet, budget)
+        budget_input = st.text_input(
+            "💰 Enter your per-meal budget greater than ₹50",
+            placeholder="Enter amount",
+            autocomplete="off"
+        )
+
+        diet = st.selectbox(
+            "🥗 Choose your diet",
+            ["Any", "Vegetarian", "Vegan", "Non-Vegetarian"]
+        )
+
+        submit = st.button("✨ Generate Meal Plan", use_container_width=True)
+
+        # ✅ Wire the button click -> enables the right-side pipeline
+        if submit:
+            loc = (location or "").strip()
+            if not loc:
+                st.warning("Please enter a location.")
+                st.stop()
+
+            try:
+                budget_val = int(str(budget_input).strip())
+            except Exception:
+                st.warning("Please enter a valid budget number (example: 150).")
+                st.stop()
+
+            if budget_val < 50:
+                st.warning("Budget must be at least ₹50.")
+                st.stop()
+
+            st.session_state["budget"] = budget_val
+            reset_on_input_change(loc, diet, budget_val)
             st.session_state["submit_clicked"] = True
-            st.session_state["suggestion"] = ""  # reset previous suggestions
+            st.session_state["suggestion"] = ""  # refresh output cleanly
 
+
+
+# ==========================
+# RIGHT COLUMN — HERO / OUTPUT
+# ==========================
 with col2:
+
     if not st.session_state["submit_clicked"]:
-        c1, c2, c3 = st.columns([1,2,1])
-        with c2:
-            st.image("panda.jpg", width=360)
-            st.markdown(
-                """
-                <div style="text-align:center; font-size:21px; color:#555; margin-top:10px;">
-                    Welcome  <b>Foodie Finder!</b> 🐼<br>
-                    Enter your location & budget for meals.
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            """
+            <div class="mm-hero">
+
+              <div class="mm-bowl">
+                <div class="mm-steam"></div>
+                <div class="mm-steam"></div>
+                <div class="mm-steam"></div>
+                <div class="mm-bowl-emoji">🍜</div>
+              </div>
+
+              <div class="mm-hero-title">Welcome to MapMyMeal ✨</div>
+
+              <div class="mm-hero-sub">
+                Tell me your <b>location</b>, <b>diet</b>, and <b>budget</b> —
+                I’ll create a realistic 4-meal plan from nearby places.
+              </div>
+
+              <div class="mm-chip-row">
+                <span class="mm-chip">📍 Location</span>
+                <span class="mm-chip">🥗 Diet</span>
+                <span class="mm-chip">💰 Budget</span>
+                <span class="mm-chip">🔄 Shuffle</span>
+              </div>
+
+              <div class="mm-tip">
+                Fresh meal ideas loading... ✨
+              </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     else:
         if not location:
             st.warning("Please enter a location.")
             st.stop()
+
+
 
         # Geocode + coordinates display
         if st.session_state["coords"] is None:
@@ -336,7 +587,8 @@ with col2:
                 chosen_restaurants,
                 chosen_menus,
                 seed,
-    )
+            )
+
 
         # Header with shuffle button
         col_a, col_b = st.columns([0.9, 0.1])
