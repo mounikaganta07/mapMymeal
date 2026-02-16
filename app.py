@@ -23,33 +23,28 @@ st.title("📍MapMyMeal🍲")
 # ---------- Theme-aware cards (no feature changes) ----------
 st.markdown("""
 <style>
-:root, [data-theme="light"]{
+:root, [data-theme="light"], [data-theme="dark"]{
   --mm-card-bg: var(--secondary-background-color);
   --mm-card-text: var(--text-color);
-  --mm-card-border: var(--background-color);
+  --mm-card-border: rgba(128,128,128,0.18);
   --mm-muted: var(--secondary-text-color);
-}
-[data-theme="dark"]{
-  --mm-card-bg: var(--secondary-background-color);
-  --mm-card-text: var(--text-color);
-  --mm-card-border: var(--background-color);
-  --mm-muted: var(--secondary-text-color);
+  --mm-accent: rgba(255, 165, 0, 0.20);
 }
 
 .mm-card{
-  padding:12px;
+  padding:16px;
   margin-bottom:12px;
   border:1px solid var(--mm-card-border);
-  border-radius:12px;
+  border-radius:14px;
   background:var(--mm-card-bg);
   color:var(--mm-card-text);
 }
 
 .mm-restaurant{
-  padding:8px;
-  margin-bottom:8px;
+  padding:10px;
+  margin-bottom:10px;
   border:1px solid var(--mm-card-border);
-  border-radius:8px;
+  border-radius:12px;
   background:var(--mm-card-bg);
   color:var(--mm-card-text);
 }
@@ -59,8 +54,36 @@ st.markdown("""
 .mm-note{ font-size:14px; color:var(--mm-muted) !important; }
 
 h1, h2, h3, h4, h5, h6 { color: var(--text-color) !important; }
+
+/* Welcome hero (no image) */
+.mm-hero{
+  border:1px solid var(--mm-card-border);
+  border-radius:18px;
+  padding:18px;
+  background: linear-gradient(135deg, var(--mm-card-bg), var(--mm-accent));
+}
+
+.mm-hero-title{
+  font-size:22px;
+  font-weight:800;
+  margin:0;
+}
+
+.mm-hero-sub{
+  margin-top:6px;
+  font-size:14px;
+  color: var(--mm-muted);
+  line-height:1.4;
+}
+
+.mm-hero-icons{
+  font-size:28px;
+  letter-spacing:3px;
+  margin-top:10px;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 # —————————————————
 # Initialize session state
